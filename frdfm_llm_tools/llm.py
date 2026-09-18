@@ -48,12 +48,14 @@ class LLM:
         return defaults.get(self.provider, "")
 
     def _resolve_api_key(self, key_path: str = None) -> str:
-        """Resolves API key from a provided file path or falls back to environment variables."""
+        """Resolves API key from path, environment variables, or a local <provider>.api_key file."""
+        # 1. Check explicitly passed key path
         if key_path:
             path = Path(key_path)
             if path.exists():
                 return path.read_text().strip()
 
+        # 2. Check environment variables
         env_var_map = {
             "openai": "OPENAI_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
@@ -66,10 +68,18 @@ class LLM:
             "custom": "CUSTOM_API_KEY"
         }
         env_key = env_var_map.get(self.provider, "LLM_API_KEY")
+        env_val = os.getenv(env_key)
+        if env_val:
+            return env_val
 
-        # Local engines often don't need real keys, but provide fallback placeholders if missing
-        default_val = "lm-studio" if self.provider == "lmstudio" else ""
-        return os.getenv(env_key, default_val)
+        # 3. Check local directory for a file named <provider>.api_key
+        local_key_file = Path(f"{self.provider}.api_key")
+        if local_key_file.exists():
+            return local_key_file.read_text().strip()
+
+        # 4. Fallback defaults
+        default_val = "lm-studio" if self.provider == "lmstudio" else "api_key"
+        return default_val
 
     def _get_default_model(self) -> str:
         """Provides a sensible default model based on the active provider."""
