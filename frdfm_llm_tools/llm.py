@@ -1,4 +1,6 @@
+import json
 import os
+import urllib.request
 from pathlib import Path
 
 
@@ -32,10 +34,10 @@ class LLM:
     def _resolve_base_url(self, base_url: str = None) -> str:
         """Resolves base URL from input or falls back to provider defaults."""
         if base_url:
-            return base_url
+            return base_url.rstrip("/")
 
         defaults = {
-            "ollama": "http://localhost:11434",
+            "ollama": "http://localhost:11434/v1",
             "lmstudio": "http://localhost:1234/v1",
             "llamacpp": "http://127.0.0.1:8080/v1",
             "openai": "https://api.openai.com/v1",
@@ -45,17 +47,15 @@ class LLM:
             "groq": "https://api.groq.com/openai/v1",
             "custom": ""
         }
-        return defaults.get(self.provider, "")
+        return defaults.get(self.provider, "").rstrip("/")
 
     def _resolve_api_key(self, key_path: str = None) -> str:
         """Resolves API key from path, environment variables, or a local <provider>.api_key file."""
-        # 1. Check explicitly passed key path
         if key_path:
             path = Path(key_path)
             if path.exists():
                 return path.read_text().strip()
 
-        # 2. Check environment variables
         env_var_map = {
             "openai": "OPENAI_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
@@ -72,14 +72,11 @@ class LLM:
         if env_val:
             return env_val
 
-        # 3. Check local directory for a file named <provider>.api_key
         local_key_file = Path(f"{self.provider}.api_key")
         if local_key_file.exists():
             return local_key_file.read_text().strip()
 
-        # 4. Fallback defaults
-        default_val = "lm-studio" if self.provider == "lmstudio" else "api_key"
-        return default_val
+        return "lm-studio" if self.provider == "lmstudio" else ""
 
     def _get_default_model(self) -> str:
         """Provides a sensible default model based on the active provider."""
@@ -105,9 +102,74 @@ class LLM:
             prompt: str,
             model: str = None,
             system: str = "") -> str:
-        """Standardized string generation."""
+        """Standardized string generation using built-in urllib."""
         active_model = model or self.model
-        return f"Hi! Using provider '{self.provider}' (Base URL: {self.base_url or 'default'}) with model '{active_model}'. Not fully initialized yet!"
+
+        if self.provider == "anthropic":
+            return self._generate_anthropic(prompt, active_model, system)
+        else:
+            return self._generate_openai_compatible(prompt, active_model, system)
+
+    def _generate_openai_compatible(self, prompt: str, model: str, system: str) -> str:
+        url = f"{self.base_url}/chat/completions"
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": model,
+            "messages": messages
+        }
+
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                return res_data["choices"][0]["message"]["content"]
+        except Exception as e:
+            raise RuntimeError(f"OpenAI-compatible request failed for provider '{self.provider}': {e}")
+
+    def _generate_anthropic(self, prompt: str, model: str, system: str) -> str:
+        url = f"{self.base_url}/messages"
+
+        payload = {
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        if system:
+            payload["system"] = system
+
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01"
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                return res_data["content"][0]["text"]
+        except Exception as e:
+            raise RuntimeError(f"Anthropic request failed: {e}")
 
     def generate_structured(self, prompt: str, response_model):
         """Standardized structured output generation."""
