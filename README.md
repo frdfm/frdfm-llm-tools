@@ -6,7 +6,7 @@ Simple LLM tools for commonly used local and remote providers.
 You can install the package (```frdfm-llm-tools```) via `pip`:
 
 ```bash
-pip install git+https://github.com/frdfm/frdfm_llm_tools.git
+pip install git+https://github.com/frdfm/frdfm-llm-tools.git
 ```
 
 ## Usage
