@@ -81,12 +81,21 @@ class LLM:
             provider_base_url: str = None,
             provider_api_key_path: str = None,
             model: str = None,
-            env_path: str = None):
+            env_path: str = None,
+            app_title: str = None,
+            app_url: str = None,
+            app_version: str = None,
+            app_description: str = 'AI Agent',
+    ):
         load_env_file(env_path)
         self.provider = self._resolve_provider(provider)
         self.base_url = self._resolve_base_url(provider_base_url)
         self.api_key = self._resolve_api_key(provider_api_key_path)
         self.model = self._resolve_model(model)
+        self.app_title = app_title
+        self.app_url = app_url
+        self.app_version = app_version
+        self.app_description = app_description
 
     def _resolve_provider(self, provider: str = None) -> str:
         provider = provider or os.getenv('LLM_PROVIDER') or os.getenv('OPENAI_PROVIDER')
@@ -142,7 +151,14 @@ class LLM:
 
         return self._generate_openai_compatible(prompt, active_model, system)
 
-    def _generate_openai_compatible(self, prompt: str, model: str, system: str) -> str:
+    def _generate_openai_compatible(
+            self,
+            prompt:
+            str,
+            model: str,
+            system: str,
+            trace_id: str = None
+    ) -> str:
         if not self.base_url:
             raise RuntimeError('base_url is not set')
 
@@ -153,9 +169,24 @@ class LLM:
         messages.append({'role': 'user', 'content': prompt})
 
         payload = {'model': model, 'messages': messages}
-        headers = {'Content-Type': 'application/json'}
+
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': self.app_description
+        }
         if self.api_key:
             headers['Authorization'] = 'Bearer ' + self.api_key
+        if self.app_title:
+            headers['X-Title'] = self.app_title
+            headers['X-OpenRouter-Title'] = self.app_title
+            headers['x-litellm-agent-id'] = self.app_title
+            headers['x-portkey-agent-id'] = self.app_title
+        if self.app_url:
+            headers['HTTP-Referer'] = self.app_url
+        if trace_id:
+            headers['X-Trace-Id'] = trace_id
+        if self.app_title and self.app_version:
+            headers['User-Agent'] = f'{self.app_title}/{self.app_version} ({self.app_description})'
 
         req = urllib.request.Request(
             url,
