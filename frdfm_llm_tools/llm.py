@@ -1,181 +1,99 @@
 import json
-import os
 import urllib.request
-from pathlib import Path
-
-
-def load_env_file(path: str) -> None:
-    if not path:
-        return
-
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(path)
-        return
-    except Exception:
-        pass
-
-    env_path = Path(path)
-    if not env_path.exists():
-        return
-
-    for line in env_path.read_text(encoding='utf-8', errors='replace').splitlines():
-        line = line.strip()
-        if not line or line.startswith('#') or '=' not in line:
-            continue
-        key, value = line.split('=', 1)
-        key = key.strip()
-        value = value.strip().strip(chr(34)).strip(chr(39))
-        if key and key not in os.environ:
-            os.environ[key] = value
+from .provider import get_provider_value
+from frdfm_python_tools import get_env
 
 
 class LLM:
-    KNOWN_PROVIDERS = {
-        'openai',
-        'anthropic',
-        'ollama',
-        'lmstudio',
-        'llamacpp',
-        'openrouter',
-        'deepinfra',
-        'groq',
-    }
-
-    BASE_URLS = {
-        'ollama': 'http://localhost:11434/v1',
-        'lmstudio': 'http://localhost:1234/v1',
-        'llamacpp': 'http://127.0.0.1:8080/v1',
-        'openai': 'https://api.openai.com/v1',
-        'anthropic': 'https://api.anthropic.com/v1',
-        'openrouter': 'https://openrouter.ai/api/v1',
-        'deepinfra': 'https://api.deepinfra.com/v1/openai',
-        'groq': 'https://api.groq.com/openai/v1',
-    }
-
-    API_KEY_ENVS = {
-        'openai': 'OPENAI_API_KEY',
-        'anthropic': 'ANTHROPIC_API_KEY',
-        'ollama': 'OLLAMA_API_KEY',
-        'lmstudio': 'LMSTUDIO_API_KEY',
-        'llamacpp': 'LLAMACPP_API_KEY',
-        'openrouter': 'OPENROUTER_API_KEY',
-        'deepinfra': 'DEEPINFRA_API_KEY',
-        'groq': 'GROQ_API_KEY',
-    }
-
-    DEFAULT_MODELS = {
-        'ollama': 'llama3',
-        'lmstudio': 'local-model',
-        'llamacpp': 'default',
-        'openai': 'gpt-4o',
-        'anthropic': 'claude-3-5-sonnet-20241022',
-        'openrouter': 'openai/gpt-4o',
-        'deepinfra': 'meta-llama/Meta-Llama-3.1-70B-Instruct',
-        'groq': 'llama-3.3-70b-versatile',
-    }
 
     def __init__(
             self,
-            provider: str = None,
-            provider_base_url: str = None,
-            provider_api_key_path: str = None,
-            model: str = None,
-            env_path: str = None,
+            generate_provider: str = None,
+            generate_base_url: str = None,
+            generate_api_key: str = None,
+            generate_model: str = None,
+            #
+            choose_provider: str = None,
+            choose_base_url: str = None,
+            choose_api_key: str = None,
+            choose_model: str = None,
+            #
+            generate_env_path: str = None,
+            choose_env_path: str = None,
+            #
             app_title: str = None,
             app_url: str = None,
             app_version: str = None,
             app_description: str = 'AI Agent',
+            #
+            system: str = ""
     ):
-        load_env_file(env_path)
-        self.provider = self._resolve_provider(provider)
-        self.base_url = self._resolve_base_url(provider_base_url)
-        self.api_key = self._resolve_api_key(provider_api_key_path)
-        self.model = self._resolve_model(model)
+        #
+        self.generate_provider = generate_provider
+
+        provider_base_url_env_var_name = get_provider_value(generate_provider, "base_url_env_var_name")
+        provider_api_key_env_var_name = get_provider_value(generate_provider, "api_key_env_var_name")
+        provider_model_env_var_name = get_provider_value(generate_provider, "model_env_var_name")
+        provider_base_url = get_provider_value(generate_provider, "base_url")
+
+        self.generate_base_url = get_env(generate_base_url, provider_base_url_env_var_name, generate_env_path, provider_base_url)
+        self.generate_api_key = get_env(generate_api_key, provider_api_key_env_var_name, generate_env_path)
+        self.generate_model = get_env(generate_model, provider_model_env_var_name, generate_env_path)
+
+        #
+        self.choose_provider = choose_provider
+
+        provider_base_url_env_var_name = get_provider_value(choose_provider, "base_url_env_var_name")
+        provider_api_key_env_var_name = get_provider_value(choose_provider, "api_key_env_var_name")
+        provider_model_env_var_name = get_provider_value(choose_provider, "model_env_var_name")
+        provider_base_url = get_provider_value(choose_provider, "base_url")
+
+        self.choose_base_url = get_env(choose_base_url, provider_base_url_env_var_name, choose_env_path, provider_base_url)
+        self.choose_api_key = get_env(choose_api_key, provider_api_key_env_var_name, choose_env_path)
+        self.choose_model = get_env(choose_model, provider_model_env_var_name, choose_env_path)
+
+        #
         self.app_title = app_title
         self.app_url = app_url
         self.app_version = app_version
         self.app_description = app_description
 
-    def _resolve_provider(self, provider: str = None) -> str:
-        provider = provider or os.getenv('LLM_PROVIDER') or os.getenv('OPENAI_PROVIDER')
-        if not provider:
-            return 'custom'
-        norm = provider.lower().strip()
-        return norm if norm in self.KNOWN_PROVIDERS else 'custom'
+        #
+        self.system = system
 
-    def _resolve_base_url(self, base_url: str = None) -> str:
-        base_url = base_url or os.getenv('OPENAI_BASE_URL') or os.getenv('LLM_BASE_URL')
-        if base_url:
-            return base_url.rstrip('/')
-        return self.BASE_URLS.get(self.provider, '').rstrip('/')
+    def __call__(self, *args, **kwargs):
+        return self.generate(*args, **kwargs)
 
-    def _resolve_api_key(self, key_path: str = None) -> str:
-        if key_path:
-            path = Path(key_path)
-            if path.exists():
-                return path.read_text().strip()
+    def generate(
+            self,
+            prompt: str,
+            trace_id: str = None
+    ) -> str:
 
-        env_key = self.API_KEY_ENVS.get(self.provider)
-        if env_key:
-            env_val = os.getenv(env_key)
-            if env_val:
-                return env_val
-
-        env_val = os.getenv('OPENAI_API_KEY') or os.getenv('LLM_API_KEY')
-        if env_val:
-            return env_val
-
-        local_key_file = Path(self.provider + '.api_key')
-        if local_key_file.exists():
-            return local_key_file.read_text().strip()
-
-        return 'lm-studio' if self.provider == 'lmstudio' else ''
-
-    def _resolve_model(self, model: str = None) -> str:
-        model = model or os.getenv('OPENAI_MODEL') or os.getenv('LLM_MODEL')
-        if model:
-            return model
-        return self.DEFAULT_MODELS.get(self.provider, '')
-
-    def __call__(self, prompt: str, system: str = '') -> str:
-        return self.generate(prompt, system=system)
-
-    def generate(self, prompt: str, model: str = None, system: str = '') -> str:
-        active_model = model or self.model
-        if not active_model:
-            raise RuntimeError('model is not set')
-
-        if self.provider == 'anthropic':
-            return self._generate_anthropic(prompt, active_model, system)
-
-        return self._generate_openai_compatible(prompt, active_model, system)
+        return self._generate_openai_compatible(prompt, trace_id)
 
     def _generate_openai_compatible(
             self,
-            prompt:
-            str,
-            model: str,
-            system: str,
+            prompt: str,
             trace_id: str = None
     ) -> str:
-        if not self.base_url:
+        if not self.generate_base_url:
             raise RuntimeError('base_url is not set')
 
-        url = self.base_url + '/chat/completions'
+        url = self.generate_base_url + '/chat/completions'
         messages = []
-        if system:
-            messages.append({'role': 'system', 'content': system})
+        if self.system:
+            messages.append({'role': 'system', 'content': self.system})
         messages.append({'role': 'user', 'content': prompt})
 
-        payload = {'model': model, 'messages': messages}
+        payload = {'model': self.generate_model, 'messages': messages}
 
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': self.app_description
         }
-        if self.api_key:
-            headers['Authorization'] = 'Bearer ' + self.api_key
+        if self.generate_api_key:
+            headers['Authorization'] = 'Bearer ' + self.generate_api_key
         if self.app_title:
             headers['X-Title'] = self.app_title
             headers['X-OpenRouter-Title'] = self.app_title
@@ -200,40 +118,258 @@ class LLM:
                 res_data = json.loads(response.read().decode('utf-8'))
                 return res_data['choices'][0]['message']['content']
         except Exception as e:
-            raise RuntimeError('OpenAI-compatible request failed for provider ' + self.provider + ': ' + str(e))
+            raise RuntimeError('OpenAI-compatible request failed for provider ' + self.generate_provider + ': ' + str(e))
 
-    def _generate_anthropic(self, prompt: str, model: str, system: str) -> str:
-        if not self.base_url:
-            raise RuntimeError('base_url is not set')
+    def choose(
+        self,
+        situation: str,
+        choices: list[str],
+        trace_id: str = None,
+    ) -> str:
 
-        url = self.base_url + '/messages'
-        payload = {
-            'model': model,
-            'max_tokens': 4096,
-            'messages': [{'role': 'user', 'content': prompt}],
+        if not isinstance(situation, str):
+            raise TypeError(
+                "situation must be a string"
+            )
+
+        if not isinstance(choices, list):
+            raise TypeError(
+                "choices must be a list"
+            )
+
+        if not choices:
+            raise ValueError(
+                "choices must not be empty"
+            )
+
+        if not all(
+            isinstance(choice, str)
+            for choice in choices
+        ):
+            raise TypeError(
+                "all choices must be strings"
+            )
+
+        if len(set(choices)) != len(choices):
+            raise ValueError(
+                "choices must be unique"
+            )
+
+        return self._choose(
+            situation,
+            choices,
+            trace_id,
+        )
+
+    def _choose(
+        self,
+        situation: str,
+        choices: list[str],
+        trace_id: str = None,
+    ) -> str:
+
+        url = self.choose_base_url + "/decisions"
+
+        criteria = {
+            choice: (
+                "The correct decision is "
+                + repr(choice)
+                + "."
+            )
+            for choice in choices
         }
-        if system:
-            payload['system'] = system
+
+        payload = {
+            "model": self.choose_model,
+            "state": situation,
+            "questions": {
+                "decision": {
+                    "type": "choice",
+                    "instructions": (
+                        "Choose the single best "
+                        "decision from the available "
+                        "choices."
+                    ),
+                    "criteria": criteria,
+                }
+            },
+        }
 
         headers = {
-            'Content-Type': 'application/json',
-            'x-api-key': self.api_key,
-            'anthropic-version': '2023-06-01',
+            "Content-Type": "application/json",
+            "User-Agent": self.app_description,
         }
+
+        if self.choose_api_key:
+            headers["Authorization"] = (
+                "Bearer " + self.choose_api_key
+            )
+
+        if self.app_title:
+            headers["X-Title"] = self.app_title
+            headers["X-OpenRouter-Title"] = (
+                self.app_title
+            )
+            headers["x-litellm-agent-id"] = (
+                self.app_title
+            )
+            headers["x-portkey-agent-id"] = (
+                self.app_title
+            )
+
+        if self.app_url:
+            headers["HTTP-Referer"] = self.app_url
+
+        if trace_id:
+            headers["X-Trace-Id"] = trace_id
+
+        if self.app_title and self.app_version:
+            headers["User-Agent"] = (
+                f"{self.app_title}/"
+                f"{self.app_version} "
+                f"({self.app_description})"
+            )
 
         req = urllib.request.Request(
             url,
-            data=json.dumps(payload).encode('utf-8'),
+            data=json.dumps(payload).encode("utf-8"),
             headers=headers,
-            method='POST',
+            method="POST",
         )
 
         try:
             with urllib.request.urlopen(req) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                return res_data['content'][0]['text']
-        except Exception as e:
-            raise RuntimeError('Anthropic request failed: ' + str(e))
+                res_data = json.loads(
+                    response.read().decode("utf-8")
+                )
 
-    def generate_structured(self, prompt: str, response_model):
-        raise NotImplementedError
+            answer = res_data["answers"]["decision"]
+
+            if answer.get("type") != "choice":
+                raise RuntimeError(
+                    "Decision API returned an "
+                    "unexpected answer type"
+                )
+
+            choice = answer.get("choice")
+
+            if choice not in choices:
+                raise RuntimeError(
+                    "Decision API returned an "
+                    "unknown choice: "
+                    + repr(choice)
+                )
+
+            return choice
+
+        except Exception as e:
+            raise RuntimeError(
+                "Decision request failed for provider "
+                + self.choose_provider
+                + ": "
+                + str(e)
+            )
+
+    def choose_probability(
+        self,
+        situation: str,
+        choices: list[str],
+        model: str = None,
+    ):
+        active_model = model or self.choose_model
+
+        if not active_model:
+            raise RuntimeError(
+                "model is not set"
+            )
+
+        if not self.choose_base_url:
+            raise RuntimeError(
+                "base_url is not set"
+            )
+
+        if not isinstance(situation, str):
+            raise TypeError(
+                "situation must be a string"
+            )
+
+        if not isinstance(choices, list):
+            raise TypeError(
+                "choices must be a list"
+            )
+
+        if not choices:
+            raise ValueError(
+                "choices must not be empty"
+            )
+
+        criteria = {
+            choice: (
+                "The correct decision is "
+                + repr(choice)
+                + "."
+            )
+            for choice in choices
+        }
+
+        payload = {
+            "model": active_model,
+            "state": situation,
+            "questions": {
+                "decision": {
+                    "type": "choice",
+                    "instructions": (
+                        "Choose the single best "
+                        "decision from the available "
+                        "choices."
+                    ),
+                    "criteria": criteria,
+                }
+            },
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": self.app_description,
+        }
+
+        if self.choose_api_key:
+            headers["Authorization"] = (
+                "Bearer " + self.choose_api_key
+            )
+
+        if self.app_title:
+            headers["X-Title"] = self.app_title
+
+        if self.app_url:
+            headers["HTTP-Referer"] = self.app_url
+
+        if self.app_title and self.app_version:
+            headers["User-Agent"] = (
+                f"{self.app_title}/"
+                f"{self.app_version} "
+                f"({self.app_description})"
+            )
+
+        req = urllib.request.Request(
+            self.choose_base_url + "/decisions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(
+                    response.read().decode("utf-8")
+                )
+
+            return res_data["answers"]["decision"]
+
+        except Exception as e:
+            raise RuntimeError(
+                "Decision request failed for provider "
+                + self.choose_provider
+                + ": "
+                + str(e)
+            )
