@@ -124,6 +124,7 @@ class LLM:
         self,
         situation: str,
         choices: list[str],
+        descriptions: list[str],
         trace_id: str = None,
     ) -> str:
 
@@ -158,6 +159,7 @@ class LLM:
         return self._choose(
             situation,
             choices,
+            descriptions,
             trace_id,
         )
 
@@ -165,18 +167,15 @@ class LLM:
         self,
         situation: str,
         choices: list[str],
+        descriptions: list[str],
         trace_id: str = None,
     ) -> str:
 
         url = self.choose_base_url + "/decisions"
 
         criteria = {
-            choice: (
-                "The correct decision is "
-                + repr(choice)
-                + "."
-            )
-            for choice in choices
+            choice: description
+            for choice, description in zip(choices, descriptions)
         }
 
         payload = {
@@ -274,6 +273,7 @@ class LLM:
         self,
         situation: str,
         choices: list[str],
+        descriptions: list[str],
         model: str = None,
     ):
         active_model = model or self.choose_model
@@ -304,12 +304,8 @@ class LLM:
             )
 
         criteria = {
-            choice: (
-                "The correct decision is "
-                + repr(choice)
-                + "."
-            )
-            for choice in choices
+            choice: description
+            for choice, description in zip(choices, descriptions)
         }
 
         payload = {
