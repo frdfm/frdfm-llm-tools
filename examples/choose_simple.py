@@ -1,10 +1,12 @@
-from frdfm_llm_tools import Decision
+from frdfm_llm_tools import LLM
 
-
-decision = Decision(env_path=r"d:\___env_var\openrouter-jev1.13.env")
+llm = LLM(
+    choose_provider="openrouter",
+    choose_env_path=r"d:\___env_var\openrouter-jev1.13.env"
+)
 
 print(
-    decision(
+    llm.choose(
         "The customer received the wrong product "
         "and wants the issue resolved as quickly as possible.",
         [
