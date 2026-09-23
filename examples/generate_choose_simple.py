@@ -20,5 +20,10 @@ print(
             "replacement",
             "store_credit",
         ],
+        [
+            "get their money back",
+            "get a replacement product",
+            "get some money as store credit instead of replacement or refund",
+        ],
     )
 )
