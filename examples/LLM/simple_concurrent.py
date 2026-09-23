@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from frdfm_llm_tools import LLM
 
-llm = LLM(env_path=r"d:\___env_var\deepinfra-qwen3.8-27B-Falsh.env")
+llm = LLM(env_path=r"d:\___env_var\deepinfra-qwen3.8-27B-Flash.env")
 
 concurrent_n = 2
 
