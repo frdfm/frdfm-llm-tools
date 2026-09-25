@@ -64,17 +64,15 @@ class LLM:
     def __call__(self, *args, **kwargs):
         return self.generate(*args, **kwargs)
 
-    def generate(
-            self,
-            prompt: str,
-            trace_id: str = None
-    ) -> str:
-
-        return self._generate_openai_compatible(prompt, trace_id)
+    def generate(self, *args, **kwargs) -> str:
+        return self._generate_openai_compatible(*args, **kwargs)
 
     def _generate_openai_compatible(
             self,
             prompt: str,
+            tools=None,
+            temperature=None,
+            max_tokens=None,
             trace_id: str = None
     ) -> str:
         if not self.generate_base_url:
@@ -87,6 +85,13 @@ class LLM:
         messages.append({'role': 'user', 'content': prompt})
 
         payload = {'model': self.generate_model, 'messages': messages}
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        if temperature:
+            payload["temperature"] = temperature
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
 
         headers = {
             'Content-Type': 'application/json',
