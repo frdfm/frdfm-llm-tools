@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frdfm-llm-tools"
-version = "0.1.6"
+version = "0.1.7"
 description = "Simple LLM tools for commonly used local and remote providers."
 readme = "README.md"
 requires-python = ">=3.9"

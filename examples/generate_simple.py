@@ -8,3 +8,8 @@ llm = LLM(
 print(
     llm("Say hello world in one short sentence.")
 )
+
+
+print(
+    llm.generate_raw("Say hello world in one short sentence.")
+)
