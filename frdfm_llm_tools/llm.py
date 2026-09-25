@@ -67,14 +67,17 @@ class LLM:
     def generate(self, *args, **kwargs) -> str:
         return self._generate_openai_compatible(*args, **kwargs)
 
-    def _generate_openai_compatible(
+    def _generate_openai_compatible(self, *args, **kwargs) -> str:
+        return self.generate_raw(*args, **kwargs)['choices'][0]['message']['content']
+
+    def generate_raw(
             self,
             prompt: str,
             tools=None,
             temperature=None,
             max_tokens=None,
             trace_id: str = None
-    ) -> str:
+    ):
         if not self.generate_base_url:
             raise RuntimeError('base_url is not set')
 
@@ -121,7 +124,7 @@ class LLM:
         try:
             with urllib.request.urlopen(req) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
-                return res_data['choices'][0]['message']['content']
+                return res_data
         except Exception as e:
             raise RuntimeError('OpenAI-compatible request failed for provider ' + self.generate_provider + ': ' + str(e))
 
