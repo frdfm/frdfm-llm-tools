@@ -76,7 +76,9 @@ class LLM:
             tools=None,
             temperature=None,
             max_tokens=None,
-            trace_id: str = None
+            trace_id: str = None,
+            tool_choice="auto",
+            extra=None
     ):
         if not self.generate_base_url:
             raise RuntimeError('base_url is not set')
@@ -90,11 +92,13 @@ class LLM:
         payload = {'model': self.generate_model, 'messages': messages}
         if tools:
             payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+            payload["tool_choice"] = tool_choice
         if temperature:
             payload["temperature"] = temperature
         if max_tokens:
             payload["max_tokens"] = max_tokens
+        if extra:
+            payload.update(extra)
 
         headers = {
             'Content-Type': 'application/json',
