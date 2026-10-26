@@ -78,7 +78,8 @@ class LLM:
             max_tokens=None,
             trace_id: str = None,
             tool_choice="auto",
-            extra=None
+            extra=None,
+            timeout=None
     ):
         if not self.generate_base_url:
             raise RuntimeError('base_url is not set')
@@ -126,7 +127,7 @@ class LLM:
         )
 
         try:
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 return res_data
         except Exception as e:
