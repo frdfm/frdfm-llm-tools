@@ -13,7 +13,7 @@ authors = [
   { name = "Fereydoun Farrahi Moghaddam" }
 ]
 
-dependencies = ["frdfm-python-tools"]
+dependencies = ["frdfm-python-tools @ git+https://github.com/frdfm/frdfm-python-tools.git"]
 
 [project.urls]
 Homepage = "https://github.com/frdfm/frdfm-llm-tools"
